@@ -24,6 +24,7 @@ name.  It's also possible to have multiple versions of the same file.
 
 This leads to some ambiguity.  When the user tries to copy over a file
 that already exists, should the client:
+
 1. Report an error and exit?
 2. Make a new file with the exact same name?
 3. Overwrite the existing file?
@@ -61,7 +62,7 @@ Usage: gdcp [options] SOURCE DEST
   -update=false: If a file of the same name already exists, update it.
 ```
 
-(You can safely ignore that httptest flag.  It's a leftover from this
+(You can safely ignore that httptest flag.  It's a leftover from the
 code's origins.)
 
 By default, it will complain and do nothing if you try to copy over a
@@ -75,7 +76,7 @@ probably not supported either; I haven't tried.
 
 The first time you use it, it should try to open up a web browser and
 ask you to authorize the app.  You may be asked to provide your Google
-login credentials.  It's know that's a bit odd for a command line app,
+login credentials.  I know that's a bit odd for a command line app,
 but it appears that there's no way around it.
 
 Once that's done, there will be an auth token stored in your OS's
@@ -89,7 +90,7 @@ In making this hack, I took copious amounts of code from the
 Google API Go Client libraries.  [1]
 
 Whatever code remains from that project retains its original license.
-The code that I've added is offered under the same (permissive)
+The code that I've added is offered under the same permissive
 license, so you're free to remix this code even further.
 
 I should be clear about one thing, though: this is not a Google
