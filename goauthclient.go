@@ -116,7 +116,7 @@ func getOAuthClient(config *oauth.Config, options *Options) *http.Client {
 		token = tokenFromWeb(config, options)
 		saveToken(cacheFile, token)
 	} else {
-		log.Printf("Using cached token %#v from %q", token, cacheFile)
+		// log.Printf("Using cached token %#v from %q", token, cacheFile)
 	}
 
 	t := &oauth.Transport{
