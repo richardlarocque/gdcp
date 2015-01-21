@@ -12,9 +12,9 @@ software to work, you'll need to mint your own by following the
 instructions laid out in [2]. It's inconvenient, but it should be
 simple enough for the kind of person that prefers command-line apps.
 
-[1] http://stackoverflow.com/questions/27585412/can-i-really-not-ship-open-source-with-client-id
-(The question was unanswered at the time of this writing.)
-[2] https://developers.google.com/accounts/docs/OAuth2
+[1] http://stackoverflow.com/questions/27585412/can-i-really-not-ship-open-source-with-client-id<br/>
+(The question was unanswered at the time of this writing.)<br/>
+[2] https://developers.google.com/accounts/docs/OAuth2<br/>
 
 ### Sharp Edges
 
@@ -24,10 +24,10 @@ name.  It's also possible to have multiple versions of the same file.
 
 This leads to some ambiguity.  When the user tries to copy over a file
 that already exists, should the client:
-a. Report an error and exit?
-b. Make a new file with the exact same name?
-c. Overwrite the existing file?
-d. Modify the existing file, which is like option (c) but it
+1. Report an error and exit?
+2. Make a new file with the exact same name?
+3. Overwrite the existing file?
+4. Modify the existing file, which is like option (c) but it
    leaves history (and space consumption) intact?
 
 I have no idea how to write a command-line UI that makes sense of
@@ -96,5 +96,5 @@ I should be clear about one thing, though: this is not a Google
 project, and it's not in any way supported by them.  It's not supported
 by me, either.
 
-[1] https://github.com/google/google-api-go-client
+[1] https://github.com/google/google-api-go-client<br/>
 (Previously at code.google.com, now on GitHub)
