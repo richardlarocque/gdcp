@@ -7,42 +7,30 @@
 package main
 
 import (
-	"encoding/gob"
-	"errors"
+	"encoding/json"
 	"fmt"
-	"hash/fnv"
 	"log"
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"os"
-	"os/exec"
+	"os/user"
 	"path/filepath"
-	"runtime"
-	"time"
 
-	"code.google.com/p/goauth2/oauth"
+	"golang.org/x/net/context"
+	"golang.org/x/oauth2"
 )
 
-type Options struct {
-	scope        string
-	cacheToken   bool
-	debug        bool
-	clientId     string
-	clientSecret string
-}
-
-func getClient(options *Options) *http.Client {
-
-	config := &oauth.Config{
-		ClientId:     options.clientId,
-		ClientSecret: options.clientSecret,
-		Scope:        options.scope,
-		AuthURL:      "https://accounts.google.com/o/oauth2/auth",
-		TokenURL:     "https://accounts.google.com/o/oauth2/token",
+func getClient(ctx context.Context, config *oauth2.Config) *http.Client {
+	cacheFile, err := tokenCacheFile()
+	if err != nil {
+		log.Fatalf("Unable to get path to cached credential file. %v", err)
 	}
-	config.Scope = options.scope
-	return getOAuthClient(config, options)
+	tok, err := tokenFromFile(cacheFile)
+	if err != nil {
+		tok = getTokenFromWeb(config)
+		saveToken(cacheFile, tok)
+	}
+	return config.Client(ctx, tok)
 }
 
 var (
@@ -50,132 +38,50 @@ var (
 	demoScope = make(map[string]string)
 )
 
-func registerDemo(name, scope string, main func(c *http.Client, argv []string)) {
-	if demoFunc[name] != nil {
-		panic(name + " already registered")
+func tokenCacheFile() (string, error) {
+	usr, err := user.Current()
+	if err != nil {
+		return "", err
 	}
-	demoFunc[name] = main
-	demoScope[name] = scope
+	tokenCacheDir := filepath.Join(usr.HomeDir, ".cache")
+	os.MkdirAll(tokenCacheDir, 0700)
+	return filepath.Join(tokenCacheDir,
+		url.QueryEscape("gdcp.json")), err
 }
 
-func osUserCacheDir() string {
-	switch runtime.GOOS {
-	case "darwin":
-		return filepath.Join(os.Getenv("HOME"), "Library", "Caches")
-	case "linux", "freebsd":
-		return filepath.Join(os.Getenv("HOME"), ".cache")
-	}
-	log.Printf("TODO: osUserCacheDir on GOOS %q", runtime.GOOS)
-	return "."
-}
-
-func tokenCacheFile(config *oauth.Config) string {
-	hash := fnv.New32a()
-	hash.Write([]byte(config.ClientId))
-	hash.Write([]byte(config.ClientSecret))
-	hash.Write([]byte(config.Scope))
-	fn := fmt.Sprintf("go-api-demo-tok%v", hash.Sum32())
-	return filepath.Join(osUserCacheDir(), url.QueryEscape(fn))
-}
-
-func tokenFromFile(file string, cacheToken bool) (*oauth.Token, error) {
-	if !cacheToken {
-		return nil, errors.New("--cachetoken is false")
-	}
+func tokenFromFile(file string) (*oauth2.Token, error) {
 	f, err := os.Open(file)
 	if err != nil {
 		return nil, err
 	}
-	t := new(oauth.Token)
-	err = gob.NewDecoder(f).Decode(t)
+	t := &oauth2.Token{}
+	err = json.NewDecoder(f).Decode(t)
+	defer f.Close()
 	return t, err
 }
 
-func saveToken(file string, token *oauth.Token) {
+func saveToken(file string, token *oauth2.Token) {
 	f, err := os.Create(file)
 	if err != nil {
-		log.Printf("Warning: failed to cache oauth token: %v", err)
-		return
+		log.Fatalf("Warning: failed to cache oauth token: %v", err)
 	}
 	defer f.Close()
-	gob.NewEncoder(f).Encode(token)
+	json.NewEncoder(f).Encode(token)
 }
 
-func condDebugTransport(debug bool) http.RoundTripper {
-	if debug {
-		return &logTransport{http.DefaultTransport}
-	} else {
-		return http.DefaultTransport
+func getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
+	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	fmt.Printf("Go to the following link in your browser then type the "+
+		"authorization code: \n%v\n", authURL)
+
+	var code string
+	if _, err := fmt.Scan(&code); err != nil {
+		log.Fatalf("Unable to read authorization code %v", err)
 	}
-}
 
-func getOAuthClient(config *oauth.Config, options *Options) *http.Client {
-	cacheFile := tokenCacheFile(config)
-	token, err := tokenFromFile(cacheFile, options.cacheToken)
+	tok, err := config.Exchange(oauth2.NoContext, code)
 	if err != nil {
-		token = tokenFromWeb(config, options)
-		saveToken(cacheFile, token)
-	} else {
-		// log.Printf("Using cached token %#v from %q", token, cacheFile)
+		log.Fatalf("Unable to retrieve token from web %v", err)
 	}
-
-	t := &oauth.Transport{
-		Token:     token,
-		Config:    config,
-		Transport: condDebugTransport(options.debug),
-	}
-	return t.Client()
-}
-
-func tokenFromWeb(config *oauth.Config, options *Options) *oauth.Token {
-	ch := make(chan string)
-	randState := fmt.Sprintf("st%d", time.Now().UnixNano())
-	ts := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
-		if req.URL.Path == "/favicon.ico" {
-			http.Error(rw, "", 404)
-			return
-		}
-		if req.FormValue("state") != randState {
-			log.Printf("State doesn't match: req = %#v", req)
-			http.Error(rw, "", 500)
-			return
-		}
-		if code := req.FormValue("code"); code != "" {
-			fmt.Fprintf(rw, "<h1>Success</h1>Authorized.")
-			rw.(http.Flusher).Flush()
-			ch <- code
-			return
-		}
-		log.Printf("no code")
-		http.Error(rw, "", 500)
-	}))
-	defer ts.Close()
-
-	config.RedirectURL = ts.URL
-	authUrl := config.AuthCodeURL(randState)
-	go openUrl(authUrl)
-	log.Printf("Authorize this app at: %s", authUrl)
-	code := <-ch
-	log.Printf("Got code: %s", code)
-
-	t := &oauth.Transport{
-		Config:    config,
-		Transport: condDebugTransport(options.debug),
-	}
-	_, err := t.Exchange(code)
-	if err != nil {
-		log.Fatalf("Token exchange error: %v", err)
-	}
-	return t.Token
-}
-
-func openUrl(url string) {
-	try := []string{"xdg-open", "google-chrome", "open"}
-	for _, bin := range try {
-		err := exec.Command(bin, url).Run()
-		if err == nil {
-			return
-		}
-	}
-	log.Printf("Error opening URL in browser.")
+	return tok
 }

@@ -11,7 +11,9 @@ import (
 	"os"
 	"path"
 
-	drive "code.google.com/p/google-api-go-client/drive/v2"
+	"golang.org/x/net/context"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/drive/v2"
 )
 
 func usage(progname string) {
@@ -45,15 +47,17 @@ func main() {
 	srcFile = flag.Arg(0)
 	dstFile = flag.Arg(1)
 
-	options := &Options{
-		scope:        drive.DriveScope,
-		cacheToken:   true,
-		debug:        false,
-		clientId:     ClientId,
-		clientSecret: ClientSecret,
+	ctx := context.Background()
+	// b, err := ioutil.ReadFile("client_secret.json")
+	// if err != nil {
+	// 	log.Fatalf("Unable to read client secret file: %v", err)
+	//}
+	// It's more convenient to embed secrets at compile time.
+	config, err := google.ConfigFromJSON(ClientSecretJson(), drive.DriveScope)
+	if err != nil {
+		log.Fatalf("Unable to parse client secret file to config: %v", err)
 	}
-
-	client := getClient(options)
+	client := getClient(ctx, config)
 
 	service, err := drive.New(client)
 	if err != nil {

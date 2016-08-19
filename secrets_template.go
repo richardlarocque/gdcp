@@ -5,14 +5,14 @@
  *
  * 1. Make your own client ID and client secret through
  *    Google's Devleoper Console.
- * 2. Fill in the blanks below.
- * 3. Remote the +build never line above.
- * 4. (optional) Rename this file to secrets.go, to take
- *    advantage of gitignore rules.
+ * 2. Download those credentials as client_secret.json
+ * 3. Return the bytes of that file in this function.
  */
 
 
 package main
 
-const ClientId string = "TODO FILL THIS IN WITH YOUR CLIENT ID"
-const ClientSecret string = "TODO FILL THIS IN WITH YOUR CLIENT SECRET"
+func ClientSecretJson() []byte {
+	return []byte("asdf")
+}
+
